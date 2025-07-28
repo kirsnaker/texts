@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {% if 'username' in session %}
+        <section class="post-form">
+            <h2>Create New Post</h2>
+            <form method="POST" action="{{ url_for('add_post') }}">
+                <textarea name="content" placeholder="What's on your mind?" required></textarea>
+                <button type="submit" class="post-btn">Post</button>
+            </form>
+        </section>
+
+        <section class="posts">
+            <h2>Your Posts</h2>
+            {% if user_posts %}
+                {% for post in user_posts %}
+                    <div class="post">
+                        <p>{{ post[1] }}</p>
+                        <div class="post-meta">
+                            <span class="post-time">{{ post[2] }}</span>
+                            <span class="post-author">You</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="no-posts">You haven't posted anything yet.</p>
+            {% endif %}
+
+            <h2>Community Posts</h2>
+            {% if other_posts %}
+                {% for post in other_posts %}
+                    <div class="post">
+                        <p>{{ post[1] }}</p>
+                        <div class="post-meta">
+                            <span class="post-time">{{ post[3] }}</span>
+                            <span class="post-author">@{{ post[2] }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="no-posts">No posts from other users yet.</p>
+            {% endif %}
+        </section>
+    {% else %}
+        <div class="welcome">
+            <h2>Welcome to Green Social!</h2>
+            <p>Please <a href="{{ url_for('login') }}">login</a> or <a href="{{ url_for('register') }}">register</a> to start posting.</p>
+        </div>
+    {% endif %}
+{% endblock %}
