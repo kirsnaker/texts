@@ -49,5 +49,25 @@
             </div>
         </div>
     </main>
+    <script>
+document.querySelector('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const response = await fetch('https://texts-jvcq.onrender.com////api/register', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      username: document.getElementById('username').value,
+      password: document.getElementById('password').value,
+      name: document.getElementById('username').value
+    })
+  });
+  
+  if (response.ok) {
+    alert('Регистрация успешна!');
+    window.location.href = 'login.html';
+  }
+});
+    </script>
 </body>
 </html>
