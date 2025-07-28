@@ -1,37 +1,28 @@
+import os
+import json
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'dev-key-123'  # Для разработки
 
-# Инициализация БД
+# Функции для работы с JSON-базой
+def load_data():
+    if not os.path.exists('data.json'):
+        return {'users': [], 'posts': []}
+    
+    with open('data.json', 'r') as f:
+        return json.load(f)
+
+def save_data(data):
+    with open('data.json', 'w') as f:
+        json.dump(data, f, indent=2)
+
+# Инициализация базы данных
 def init_db():
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    ''')
-    
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS posts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        content TEXT NOT NULL,
-        author_id INTEGER NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (author_id) REFERENCES users(id)
-    )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    if not os.path.exists('data.json'):
+        save_data({'users': [], 'posts': []})
 
 init_db()
 
@@ -39,34 +30,23 @@ init_db()
 @app.route('/')
 def index():
     if 'user_id' in session:
-        conn = sqlite3.connect('database.db')
-        cursor = conn.cursor()
+        data = load_data()
+        current_user_id = session['user_id']
         
-        # Получаем посты пользователя
-        cursor.execute('''
-        SELECT p.id, p.content, p.created_at 
-        FROM posts p
-        WHERE p.author_id = ?
-        ORDER BY p.created_at DESC
-        ''', (session['user_id'],))
-        user_posts = cursor.fetchall()
+        user_posts = [
+            post for post in data['posts']
+            if post['author_id'] == current_user_id
+        ]
         
-        # Получаем посты других пользователей
-        cursor.execute('''
-        SELECT p.id, p.content, u.username, p.created_at 
-        FROM posts p
-        JOIN users u ON p.author_id = u.id
-        WHERE p.author_id != ?
-        ORDER BY p.created_at DESC
-        ''', (session['user_id'],))
-        other_posts = cursor.fetchall()
-        
-        conn.close()
+        other_posts = [
+            post for post in data['posts']
+            if post['author_id'] != current_user_id
+        ]
         
         return render_template('index.html',
-                             username=session['username'],
-                             user_posts=user_posts,
-                             other_posts=other_posts)
+                            username=session['username'],
+                            user_posts=user_posts,
+                            other_posts=other_posts)
     return redirect(url_for('login'))
 
 # Регистрация
@@ -80,22 +60,24 @@ def register():
             flash('Username must be at least 3 characters and password 4 characters')
             return redirect(url_for('register'))
         
-        conn = sqlite3.connect('database.db')
-        cursor = conn.cursor()
+        data = load_data()
         
-        try:
-            cursor.execute('''
-            INSERT INTO users (username, password)
-            VALUES (?, ?)
-            ''', (username, generate_password_hash(password)))
-            conn.commit()
-            flash('Registration successful! Please login.')
-            return redirect(url_for('login'))
-        except sqlite3.IntegrityError:
+        if any(user['username'] == username for user in data['users']):
             flash('Username already exists')
             return redirect(url_for('register'))
-        finally:
-            conn.close()
+        
+        new_user = {
+            'id': len(data['users']) + 1,
+            'username': username,
+            'password': generate_password_hash(password),
+            'registered_at': datetime.now().isoformat()
+        }
+        
+        data['users'].append(new_user)
+        save_data(data)
+        
+        flash('Registration successful! Please login.')
+        return redirect(url_for('login'))
     
     return render_template('register.html')
 
@@ -106,18 +88,12 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        conn = sqlite3.connect('database.db')
-        cursor = conn.cursor()
+        data = load_data()
+        user = next((u for u in data['users'] if u['username'] == username), None)
         
-        cursor.execute('''
-        SELECT id, username, password FROM users WHERE username = ?
-        ''', (username,))
-        user = cursor.fetchone()
-        conn.close()
-        
-        if user and check_password_hash(user[2], password):
-            session['user_id'] = user[0]
-            session['username'] = user[1]
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
             return redirect(url_for('index'))
         
         flash('Invalid username or password')
@@ -140,14 +116,17 @@ def add_post():
     
     content = request.form['content'].strip()
     if len(content) > 0:
-        conn = sqlite3.connect('database.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-        INSERT INTO posts (content, author_id)
-        VALUES (?, ?)
-        ''', (content, session['user_id']))
-        conn.commit()
-        conn.close()
+        data = load_data()
+        
+        new_post = {
+            'id': len(data['posts']) + 1,
+            'content': content,
+            'author_id': session['user_id'],
+            'created_at': datetime.now().isoformat()
+        }
+        
+        data['posts'].append(new_post)
+        save_data(data)
     
     return redirect(url_for('index'))
 
