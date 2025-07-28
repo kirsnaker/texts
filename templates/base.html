@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Green Social Network</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Green Social</h1>
+            {% if 'username' in session %}
+                <div class="user-info">
+                    Welcome, {{ username }}! 
+                    <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+                </div>
+            {% endif %}
+        </header>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for message in messages %}
+                        <div class="flash">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="footer">
+            <p>Simple Green Social Network &copy; 2023</p>
+        </footer>
+    </div>
+</body>
+</html>
